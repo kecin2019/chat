@@ -138,7 +138,7 @@ void ChatService::clientCloseException(const TcpConnectionPtr &conn)
     User user;
     {
         lock_guard<mutex> lock(connMutex_);
-        for (auto it = userConnMap_.begin(); it != userConnMap_.end();)
+        for (auto it = userConnMap_.begin(); it != userConnMap_.end(); ++it)
         {
             if (it->second == conn)
             {
