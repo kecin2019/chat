@@ -7,6 +7,7 @@ enum EnMsgTpye
 {
     LOGIN_MSG = 1,  // 登录消息
     LOGIN_MSG_ACK,  // 登录响应消息
+    LOGIN_OUT_MSG,  // 登出消息
     REG_MSG,        // 注册消息
     REG_MSG_ACK,    // 注册响应消息
     ONE_CHAT_MSG,   // 聊天消息
@@ -17,4 +18,5 @@ enum EnMsgTpye
     ADD_GROUP_MSG,    // 加入群组
     QUIT_GROUP_MSG,   // 退出群组
     GROUP_CHAT_MSG,   // 群聊消息
+
 };
