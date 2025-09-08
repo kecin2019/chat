@@ -18,4 +18,5 @@ enum EnMsgTpye
     ADD_GROUP_MSG,    // 加入群组
     QUIT_GROUP_MSG,   // 退出群组
     GROUP_CHAT_MSG,   // 群聊消息
+
 };
