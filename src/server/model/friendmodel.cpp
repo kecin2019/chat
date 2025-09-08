@@ -1,5 +1,8 @@
 #include "friendmodel.hpp"
 #include "db.hpp"
+#include "mysqlpool.hpp"
+#include <iostream>
+using namespace std;
 
 // 添加好友方法
 bool FriendModel::addFriend(int userid, int friendId)
@@ -7,11 +10,20 @@ bool FriendModel::addFriend(int userid, int friendId)
     char sql[1024] = {0};
     sprintf(sql, "insert into Friend VALUES(%d, %d)",
             userid, friendId);
-    MySQL mysql;
-    if (mysql.connect())
+
+    MYSQL *conn = MySQLPool::instance().getConnection();
+    if (conn)
     {
-        mysql.update(sql);
-        return true;
+        if (mysql_query(conn, sql) == 0)
+        {
+            MySQLPool::instance().releaseConnection(conn);
+            return true;
+        }
+        else
+        {
+            cout << "addFriend error: " << mysql_error(conn) << endl;
+        }
+        MySQLPool::instance().releaseConnection(conn);
     }
     return false;
 }
@@ -22,11 +34,20 @@ bool FriendModel::delFriend(int userid, int friendId)
     char sql[1024] = {0};
     sprintf(sql, "delete from Friend where userid = %d and friendId = %d",
             userid, friendId);
-    MySQL mysql;
-    if (mysql.connect())
+
+    MYSQL *conn = MySQLPool::instance().getConnection();
+    if (conn)
     {
-        mysql.update(sql);
-        return true;
+        if (mysql_query(conn, sql) == 0)
+        {
+            MySQLPool::instance().releaseConnection(conn);
+            return true;
+        }
+        else
+        {
+            cout << "delFriend error: " << mysql_error(conn) << endl;
+        }
+        MySQLPool::instance().releaseConnection(conn);
     }
     return false;
 }
@@ -40,24 +61,32 @@ vector<User> FriendModel::queryFriends(int userid)
                  " OR (b.userid = a.id AND b.friendid = %d)",
             userid, userid);
 
-    MySQL mysql;
+    MYSQL *conn = MySQLPool::instance().getConnection();
     vector<User> vec;
-    if (mysql.connect())
+    if (conn)
     {
-        MYSQL_RES *res = mysql.query(sql);
-        if (res != nullptr)
+        if (mysql_query(conn, sql) == 0)
         {
-            MYSQL_ROW row;
-            while ((row = mysql_fetch_row(res)) != nullptr)
+            MYSQL_RES *res = mysql_use_result(conn);
+            if (res != nullptr)
             {
-                User user;
-                user.setId(atoi(row[0]));
-                user.setName(row[1]);
-                user.setState(row[2]);
-                vec.push_back(user);
+                MYSQL_ROW row;
+                while ((row = mysql_fetch_row(res)) != nullptr)
+                {
+                    User user;
+                    user.setId(atoi(row[0]));
+                    user.setName(row[1]);
+                    user.setState(row[2]);
+                    vec.push_back(user);
+                }
+                mysql_free_result(res);
             }
-            mysql_free_result(res);
         }
+        else
+        {
+            cout << "queryFriends error: " << mysql_error(conn) << endl;
+        }
+        MySQLPool::instance().releaseConnection(conn);
     }
     return vec;
 }

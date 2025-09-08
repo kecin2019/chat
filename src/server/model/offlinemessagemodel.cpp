@@ -1,5 +1,8 @@
 #include "offlinemessagemodel.hpp"
 #include "db.hpp"
+#include "mysqlpool.hpp"
+#include <iostream>
+using namespace std;
 
 // 存储用户的离线消息
 void OfflineMsgModel::insert(int userid, string msg)
@@ -9,10 +12,14 @@ void OfflineMsgModel::insert(int userid, string msg)
     sprintf(sql, "insert into OfflineMessage VALUES(%d, '%s')",
             userid, msg.c_str());
 
-    MySQL mysql;
-    if (mysql.connect())
+    MYSQL *conn = MySQLPool::instance().getConnection();
+    if (conn)
     {
-        mysql.update(sql);
+        if (mysql_query(conn, sql) != 0)
+        {
+            cout << "insert offline message error: " << mysql_error(conn) << endl;
+        }
+        MySQLPool::instance().releaseConnection(conn);
     }
 }
 // 删除用户的离线消息
@@ -23,10 +30,14 @@ void OfflineMsgModel::remove(int userid)
     sprintf(sql, "delete from OfflineMessage where userid = %d",
             userid);
 
-    MySQL mysql;
-    if (mysql.connect())
+    MYSQL *conn = MySQLPool::instance().getConnection();
+    if (conn)
     {
-        mysql.update(sql);
+        if (mysql_query(conn, sql) != 0)
+        {
+            cout << "remove offline message error: " << mysql_error(conn) << endl;
+        }
+        MySQLPool::instance().releaseConnection(conn);
     }
 }
 // 获取用户的离线消息
@@ -37,21 +48,29 @@ vector<string> OfflineMsgModel::query(int userid)
     sprintf(sql, "select message from OfflineMessage where userid = %d",
             userid);
 
-    MySQL mysql;
     vector<string> vec;
-    if (mysql.connect())
+    MYSQL *conn = MySQLPool::instance().getConnection();
+    if (conn)
     {
-        MYSQL_RES *res = mysql.query(sql);
-        if (res != nullptr)
+        if (mysql_query(conn, sql) == 0)
         {
-            // 把userid用户的所有离线消息放入vec中返回
-            MYSQL_ROW row;
-            while ((row = mysql_fetch_row(res)) != nullptr)
+            MYSQL_RES *res = mysql_use_result(conn);
+            if (res != nullptr)
             {
-                vec.push_back(row[0]);
+                // 把userid用户的所有离线消息放入vec中返回
+                MYSQL_ROW row;
+                while ((row = mysql_fetch_row(res)) != nullptr)
+                {
+                    vec.push_back(row[0]);
+                }
+                mysql_free_result(res);
             }
-            mysql_free_result(res);
         }
+        else
+        {
+            cout << "query offline message error: " << mysql_error(conn) << endl;
+        }
+        MySQLPool::instance().releaseConnection(conn);
     }
     return vec;
 }

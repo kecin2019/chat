@@ -1,5 +1,6 @@
 #include "chatserver.hpp"
 #include "chatservice.hpp"
+#include "mysqlpool.hpp"
 #include <iostream>
 #include <signal.h>
 
@@ -19,6 +20,8 @@ int main(int argc, char **argv)
         cerr << "command invalid! example: ./ChatServer 127.0.0.1 6000" << endl;
         exit(-1);
     }
+    // 初始化数据库连接池
+    MySQLPool::instance().init(10, "127.0.0.1", "kecin", "jkw123", "chat");
 
     // 解析通过命令行参数传递的ip和port
     char *ip = argv[1];

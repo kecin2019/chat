@@ -1,5 +1,8 @@
 #include "groupmodel.hpp"
 #include "db.hpp"
+#include "mysqlpool.hpp"
+#include <iostream>
+using namespace std;
 
 // 创建群组
 bool GroupModel::createGroup(Group &group)
@@ -7,12 +10,21 @@ bool GroupModel::createGroup(Group &group)
     char sql[1024] = {0};
     sprintf(sql, "insert into Allgroup(groupname, groupdesc) VALUES('%s', '%s')",
             group.getName().c_str(), group.getDesc().c_str());
-    MySQL mysql;
-    if (mysql.connect())
+
+    MYSQL *conn = MySQLPool::instance().getConnection();
+    if (conn)
     {
-        mysql.update(sql);
-        group.setId(mysql_insert_id(mysql.getConn()));
-        return true;
+        if (mysql_query(conn, sql) == 0)
+        {
+            group.setId(mysql_insert_id(conn));
+            MySQLPool::instance().releaseConnection(conn);
+            return true;
+        }
+        else
+        {
+            cout << "createGroup error: " << mysql_error(conn) << endl;
+        }
+        MySQLPool::instance().releaseConnection(conn);
     }
     return false;
 }
@@ -23,11 +35,20 @@ bool GroupModel::joinGroup(int userid, int groupid, string role)
     char sql[1024] = {0};
     sprintf(sql, "insert into GroupUser VALUES(%d, %d, '%s')",
             groupid, userid, role.c_str());
-    MySQL mysql;
-    if (mysql.connect())
+
+    MYSQL *conn = MySQLPool::instance().getConnection();
+    if (conn)
     {
-        mysql.update(sql);
-        return true;
+        if (mysql_query(conn, sql) == 0)
+        {
+            MySQLPool::instance().releaseConnection(conn);
+            return true;
+        }
+        else
+        {
+            cout << "joinGroup error: " << mysql_error(conn) << endl;
+        }
+        MySQLPool::instance().releaseConnection(conn);
     }
     return false;
 }
@@ -38,11 +59,20 @@ bool GroupModel::quitGroup(int userid, int groupid)
     char sql[1024] = {0};
     sprintf(sql, "delete from GroupUser where userid = %d and groupid = %d",
             userid, groupid);
-    MySQL mysql;
-    if (mysql.connect())
+
+    MYSQL *conn = MySQLPool::instance().getConnection();
+    if (conn)
     {
-        mysql.update(sql);
-        return true;
+        if (mysql_query(conn, sql) == 0)
+        {
+            MySQLPool::instance().releaseConnection(conn);
+            return true;
+        }
+        else
+        {
+            cout << "quitGroup error: " << mysql_error(conn) << endl;
+        }
+        MySQLPool::instance().releaseConnection(conn);
     }
     return false;
 }
@@ -59,46 +89,57 @@ vector<Group> GroupModel::queryGroups(int userId)
             userId);
 
     vector<Group> groupVec;
-    MySQL mysql;
-    if (mysql.connect())
+    MYSQL *conn = MySQLPool::instance().getConnection();
+    if (conn)
     {
-        MYSQL_RES *res = mysql.query(sql);
-        if (res != nullptr)
+        if (mysql_query(conn, sql) == 0)
         {
-            MYSQL_ROW row;
-            while ((row = mysql_fetch_row(res)) != nullptr)
+            MYSQL_RES *res = mysql_use_result(conn);
+            if (res != nullptr)
             {
-                Group group;
-                group.setId(atoi(row[0]));
-                group.setName(row[1]);
-                group.setDesc(row[2]);
-                groupVec.push_back(group);
+                MYSQL_ROW row;
+                while ((row = mysql_fetch_row(res)) != nullptr)
+                {
+                    Group group;
+                    group.setId(atoi(row[0]));
+                    group.setName(row[1]);
+                    group.setDesc(row[2]);
+                    groupVec.push_back(group);
+                }
+                mysql_free_result(res);
             }
-            mysql_free_result(res);
         }
-    }
+        else
+        {
+            cout << "queryGroups error: " << mysql_error(conn) << endl;
+        }
 
-    // 查询群组的用户信息
-    for (auto &group : groupVec)
-    {
-        sprintf(sql, "select a.id, a.name from User a \
-                inner join GroupUser as b on b.userid = a.id where b.groupid = %d and b.userid != %d",
-                group.getId(), userId);
-        MYSQL_RES *res = mysql.query(sql);
-        if (res != nullptr)
+        // 查询群组的用户信息
+        for (auto &group : groupVec)
         {
-            MYSQL_ROW row;
-            while ((row = mysql_fetch_row(res)) != nullptr)
+            sprintf(sql, "select a.id, a.name from User a \
+                    inner join GroupUser as b on b.userid = a.id where b.groupid = %d and b.userid != %d",
+                    group.getId(), userId);
+            if (mysql_query(conn, sql) == 0)
             {
-                GroupUser user;
-                user.setId(atoi(row[0]));
-                user.setName(row[1]);
-                user.setState(row[2]);
-                user.setRole(row[3]);
-                group.getUsers().push_back(user);
+                MYSQL_RES *res = mysql_use_result(conn);
+                if (res != nullptr)
+                {
+                    MYSQL_ROW row;
+                    while ((row = mysql_fetch_row(res)) != nullptr)
+                    {
+                        GroupUser user;
+                        user.setId(atoi(row[0]));
+                        user.setName(row[1]);
+                        user.setState(row[2]);
+                        user.setRole(row[3]);
+                        group.getUsers().push_back(user);
+                    }
+                    mysql_free_result(res);
+                }
             }
-            mysql_free_result(res);
         }
+        MySQLPool::instance().releaseConnection(conn);
     }
     return groupVec;
 }
@@ -111,19 +152,27 @@ vector<int> GroupModel::queryGroupUsers(int userid, int groupid)
             groupid, userid);
 
     vector<int> userVec;
-    MySQL mysql;
-    if (mysql.connect())
+    MYSQL *conn = MySQLPool::instance().getConnection();
+    if (conn)
     {
-        MYSQL_RES *res = mysql.query(sql);
-        if (res != nullptr)
+        if (mysql_query(conn, sql) == 0)
         {
-            MYSQL_ROW row;
-            while ((row = mysql_fetch_row(res)) != nullptr)
+            MYSQL_RES *res = mysql_use_result(conn);
+            if (res != nullptr)
             {
-                userVec.push_back(atoi(row[0]));
+                MYSQL_ROW row;
+                while ((row = mysql_fetch_row(res)) != nullptr)
+                {
+                    userVec.push_back(atoi(row[0]));
+                }
+                mysql_free_result(res);
             }
-            mysql_free_result(res);
         }
+        else
+        {
+            cout << "queryGroupUsers error: " << mysql_error(conn) << endl;
+        }
+        MySQLPool::instance().releaseConnection(conn);
     }
     return userVec;
 }
