@@ -31,11 +31,11 @@ bool MySQL::connect()
     {
         // C和C++代码默认的编码字符集是ASCII，如果不设置，从MySQL数据库读取中文时会显示？
         mysql_query(conn_, "set names utf8");
-        LOG_INFO << __FILE__ << ":" << __LINE__ << " 数据库连接成功!";
+        LOG_INFO << " 数据库连接成功!";
     }
     else
     {
-        LOG_INFO << __FILE__ << ":" << __LINE__ << " 数据库连接失败!";
+        LOG_INFO << " 数据库连接失败!";
     }
     return p;
 }

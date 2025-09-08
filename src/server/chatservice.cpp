@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <muduo/base/Logging.h>
 
 using namespace std;
@@ -22,6 +23,96 @@ ChatService::ChatService()
     msgHandlerMap_.insert({LOGIN_MSG, std::bind(&ChatService::login, this, _1, _2, _3)});
     msgHandlerMap_.insert({REG_MSG, std::bind(&ChatService::reg, this, _1, _2, _3)});
     msgHandlerMap_.insert({ONE_CHAT_MSG, std::bind(&ChatService::oneChat, this, _1, _2, _3)});
+    msgHandlerMap_.insert({ADD_FRIEND_MSG, std::bind(&ChatService::addFriend, this, _1, _2, _3)});
+    msgHandlerMap_.insert({DEL_FRIEND_MSG, std::bind(&ChatService::delFriend, this, _1, _2, _3)});
+    msgHandlerMap_.insert({CREATE_GROUP_MSG, std::bind(&ChatService::createGroup, this, _1, _2, _3)});
+    msgHandlerMap_.insert({ADD_GROUP_MSG, std::bind(&ChatService::addGroup, this, _1, _2, _3)});
+    msgHandlerMap_.insert({QUIT_GROUP_MSG, std::bind(&ChatService::quitGroup, this, _1, _2, _3)});
+    msgHandlerMap_.insert({GROUP_CHAT_MSG, std::bind(&ChatService::groupChat, this, _1, _2, _3)});
+}
+
+// 服务器异常, 业务重置方法
+void ChatService::reset()
+{
+    // 把online状态的用户状态改为offline
+    usermodel_.resetState();
+}
+
+// 添加好友业务 msgid id frendid
+void ChatService::addFriend(const TcpConnectionPtr &conn, json &js, Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    int friendid = js["friendid"].get<int>();
+
+    // 存储好友信息
+    friendmodel_.addFriend(userid, friendid);
+}
+
+// 删除好友业务
+void ChatService::delFriend(const TcpConnectionPtr &conn, json &js, Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    int friendid = js["friendid"].get<int>();
+
+    // 删除好友信息
+    friendmodel_.delFriend(userid, friendid);
+}
+
+// 创建群组业务
+void ChatService::createGroup(const TcpConnectionPtr &conn, json &js, Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    string groupname = js["groupname"];
+    string groupdesc = js["groupdesc"];
+
+    // 存储新创建的群组信息
+    Group group(-1, groupname, groupdesc);
+    if (groupmodel_.createGroup(group))
+    {
+        // 存储群组创建人信息
+        groupmodel_.joinGroup(userid, group.getId(), "creator");
+    }
+}
+
+// 加入群组业务
+void ChatService::addGroup(const TcpConnectionPtr &conn, json &js, Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    int groupid = js["groupid"].get<int>();
+    groupmodel_.joinGroup(userid, groupid, "normal");
+}
+
+// 退出群组业务
+void ChatService::quitGroup(const TcpConnectionPtr &conn, json &js, Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    int groupid = js["groupid"].get<int>();
+    groupmodel_.quitGroup(userid, groupid);
+}
+
+// 群组聊天业务
+void ChatService::groupChat(const TcpConnectionPtr &conn, json &js, Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    int groupid = js["groupid"].get<int>();
+    vector<int> useridVec = groupmodel_.queryGroupUsers(userid, groupid);
+    {
+        lock_guard<mutex> lock(connMutex_);
+        for (int id : useridVec)
+        {
+            auto it = userConnMap_.find(id);
+            if (it != userConnMap_.end())
+            {
+                // 转发群消息
+                it->second->send(js.dump());
+            }
+            else
+            {
+                // 存储离线群消息
+                offlineMsgModel_.insert(id, js.dump());
+            }
+        }
+    }
 }
 
 // 获取消息对应的处理器
@@ -87,6 +178,21 @@ void ChatService::login(const TcpConnectionPtr &conn, json &js, Timestamp time)
                 response["offlinemsg"] = vec;
                 // 读取该用户的离线消息后, 把该用户的所有离线消息删除掉
                 offlineMsgModel_.remove(id);
+            }
+            // 查询该用户的好友信息并返回
+            vector<User> userVec = friendmodel_.queryFriends(id);
+            if (!userVec.empty())
+            {
+                vector<string> vec2;
+                for (auto &user : userVec)
+                {
+                    json js;
+                    js["id"] = user.getId();
+                    js["name"] = user.getName();
+                    js["state"] = user.getState();
+                    vec2.push_back(js.dump());
+                }
+                response["friends"] = vec2;
             }
 
             conn->send(response.dump());
