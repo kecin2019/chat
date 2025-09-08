@@ -123,6 +123,7 @@ int main(int argc, char **argv)
                     if (responsejs["errno"].get<int>() != 0) // 登录失败
                     {
                         cerr << responsejs["errmsg"] << endl;
+                        continue; // 返回主菜单
                     }
                     else // 登录成功
                     {
@@ -213,9 +214,15 @@ int main(int argc, char **argv)
                         // 进入聊天主菜单界面
                         isMainMenuRunning = true;
                         mainMenu(clientfd);
+                        // // 如果从主菜单退出，则直接返回主循环
+                        // if (!isMainMenuRunning)
+                        // {
+                        //     break;
+                        // }
                     }
                 }
             }
+            break;
         }
         case 2: // register业务
         {
@@ -259,6 +266,7 @@ int main(int argc, char **argv)
                     }
                 }
             }
+            break;
         }
         case 3: // quit业务
             close(clientfd);
@@ -382,7 +390,6 @@ void showCurrentUserData()
     cout << "================================login==============================" << endl;
     cout << "当前用户id: " << g_currentUser.getId() << endl;
     cout << "当前用户昵称: " << g_currentUser.getName() << endl;
-    cout << "当前用户状态: " << g_currentUser.getState() << endl;
     cout << "==============================friend list=============================" << endl;
     cout << "当前用户好友列表: " << endl;
 
@@ -391,7 +398,6 @@ void showCurrentUserData()
         for (auto &user : g_currentUserFriendList)
         {
             cout << "用户id: " << user.getId() << ", 昵称: " << user.getName() << ", 状态: " << user.getState() << endl;
-            cout << "用户状态: " << user.getState() << endl;
         }
     }
     cout << "==============================group list=============================" << endl;
@@ -507,8 +513,8 @@ void createGroup(int clientfd, string cmdbuf)
     json js;
     js["msgid"] = CREATE_GROUP_MSG;
     js["id"] = g_currentUser.getId();
-    js["name"] = groupname;
-    js["desc"] = groupdesc;
+    js["groupname"] = groupname;
+    js["groupdesc"] = groupdesc;
     string buffer = js.dump();
     int len = send(clientfd, buffer.c_str(), strlen(buffer.c_str()) + 1, 0);
     if (len == -1)

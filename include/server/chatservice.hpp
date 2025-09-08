@@ -5,6 +5,7 @@
 #include "offlinemessagemodel.hpp"
 #include "friendmodel.hpp"
 #include "groupmodel.hpp"
+#include "redis.hpp"
 
 #include <muduo/net/TcpConnection.h>
 #include <unordered_map>
@@ -53,6 +54,8 @@ public:
     void reset();
     // 获取消息对应的处理器
     MsgHandler getMsgHandler(int msgid);
+    // 从redis消息队列中获取订阅的消息
+    void handleRedisSubscribeMessage(int userid, string message);
 
 private:
     ChatService();
@@ -71,4 +74,6 @@ private:
     FriendModel friendmodel_;
     // 群组数据操作类对象
     GroupModel groupmodel_;
+    // redis客户端对象
+    Redis redis_;
 };
