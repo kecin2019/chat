@@ -29,6 +29,7 @@ ChatService::ChatService()
     msgHandlerMap_.insert({ADD_GROUP_MSG, std::bind(&ChatService::addGroup, this, _1, _2, _3)});
     msgHandlerMap_.insert({QUIT_GROUP_MSG, std::bind(&ChatService::quitGroup, this, _1, _2, _3)});
     msgHandlerMap_.insert({GROUP_CHAT_MSG, std::bind(&ChatService::groupChat, this, _1, _2, _3)});
+    msgHandlerMap_.insert({LOGIN_OUT_MSG, std::bind(&ChatService::loginOut, this, _1, _2, _3)});
 }
 
 // 服务器异常, 业务重置方法
@@ -236,6 +237,26 @@ void ChatService::reg(const TcpConnectionPtr &conn, json &js, Timestamp time)
         response["errno"] = 1;
         response["errmsg"] = "注册失败";
         conn->send(response.dump());
+    }
+}
+
+// 处理注销业务
+void ChatService::loginOut(const TcpConnectionPtr &conn, json &js, Timestamp time)
+{
+    int userid = js["id"].get<int>();
+    {
+        lock_guard<mutex> lock(connMutex_);
+        auto it = userConnMap_.find(userid);
+        if (it != userConnMap_.end())
+        {
+            // 从map表删除用户的连接信息
+            userConnMap_.erase(it);
+        }
+        // 更新用户状态信息 state online -> offline
+        User user;
+        user.setId(userid);
+        user.setState("offline");
+        usermodel_.updateState(user);
     }
 }
 
